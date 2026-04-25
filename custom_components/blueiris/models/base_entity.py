@@ -120,15 +120,25 @@ class BlueIrisEntity(Entity):
             if self.entity is not None:
                 previous_state = self.entity.state
 
+                _LOGGER.debug(
+                    f"[MQTT DEBUG] _async_schedule_immediate_update | entity={self.name!r} "
+                    f"| domain={self.current_domain!r} | previous_state={previous_state}"
+                )
+
                 entity = self.entity_manager.get_entity(self.current_domain, self.name)
 
                 if entity is None:
-                    _LOGGER.debug(f"Skip updating {self.name}, Entity is None")
+                    _LOGGER.debug(f"[MQTT DEBUG] Skip updating {self.name!r} — Entity not found in entity_manager (domain={self.current_domain!r})")
 
                 elif entity.disabled:
-                    _LOGGER.debug(f"Skip updating {self.name}, Entity is disabled")
+                    _LOGGER.debug(f"[MQTT DEBUG] Skip updating {self.name!r} — Entity is disabled")
 
                 else:
+                    new_state = entity.state
+                    _LOGGER.debug(
+                        f"[MQTT DEBUG] Updating {self.name!r} | {previous_state} → {new_state} "
+                        f"| topic={getattr(entity, 'topic', 'N/A')!r} | event={getattr(entity, 'event', 'N/A')!r}"
+                    )
                     self.entity = entity
                     if self.entity is not None:
                         self._immediate_update(previous_state)

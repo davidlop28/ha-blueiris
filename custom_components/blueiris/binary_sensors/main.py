@@ -67,21 +67,61 @@ class BlueIrisMainBinarySensor(BinarySensorEntity, BlueIrisEntity):
 
     def _state_message_received(self, message: ReceiveMessage):
         topic = message.topic
-        payload = json.loads(message.payload)
+        raw_payload = message.payload
 
-        event_type = payload.get(MQTT_MESSAGE_TYPE, MQTT_MESSAGE_VALUE_UNKNOWN).lower()
+        _LOGGER.debug(f"[MQTT DEBUG] ── Incoming message ──────────────────────────")
+        _LOGGER.debug(f"[MQTT DEBUG] Topic   : {topic}")
+        _LOGGER.debug(f"[MQTT DEBUG] Payload : {raw_payload}")
+
+        try:
+            payload = json.loads(raw_payload)
+        except Exception as parse_ex:
+            _LOGGER.error(f"[MQTT DEBUG] Failed to parse JSON payload: {raw_payload!r} | Error: {parse_ex}")
+            return
+
+        raw_event_type = payload.get(MQTT_MESSAGE_TYPE, MQTT_MESSAGE_VALUE_UNKNOWN)
         trigger = payload.get(MQTT_MESSAGE_TRIGGER, MQTT_MESSAGE_VALUE_UNKNOWN).lower()
 
+        _LOGGER.debug(f"[MQTT DEBUG] Extracted type    : {raw_event_type!r}")
+        _LOGGER.debug(f"[MQTT DEBUG] Extracted trigger : {trigger!r}")
+
+        event_type = raw_event_type.lower()
+
         if SENSOR_MOTION_NAME.lower() in event_type:
+            _LOGGER.debug(f"[MQTT DEBUG] Normalising event_type '{event_type}' → '{SENSOR_MOTION_NAME.lower()}'")
             event_type = SENSOR_MOTION_NAME.lower()
 
         value = trigger == STATE_ON
 
+        _LOGGER.debug(f"[MQTT DEBUG] Resolved event_type : {event_type!r}")
+        _LOGGER.debug(f"[MQTT DEBUG] Resolved value      : {value}  (trigger '{trigger}' == '{STATE_ON}')")
+
+        # Show the exact key that will be written to mqtt_states
+        expected_key = f"{topic}_{event_type}".lower()
+        _LOGGER.debug(f"[MQTT DEBUG] mqtt_states key     : {expected_key!r}")
+
+        # Show all currently registered sensor topics so we can spot mismatches
+        registered_topics = set()
+        for domain_entities in self.entity_manager.entities.values():
+            for ent in domain_entities.values():
+                if hasattr(ent, "topic") and ent.topic:
+                    registered_topics.add(ent.topic.lower())
+        _LOGGER.debug(f"[MQTT DEBUG] Registered topics   : {sorted(registered_topics)}")
+
+        if topic.lower() not in registered_topics:
+            _LOGGER.warning(
+                f"[MQTT DEBUG] ⚠ Topic '{topic}' does NOT match any registered entity topic! "
+                f"State update will be stored but no entity will consume it."
+            )
+
         self.entity_manager.set_mqtt_state(topic, event_type, value)
+
+        _LOGGER.debug(f"[MQTT DEBUG] mqtt_states after set: { {k: v for k, v in self.entity_manager.mqtt_states.items()} }")
 
         self.entity_manager.update()
 
         self.hass.async_create_task(self.ha.dispatch_all())
+        _LOGGER.debug(f"[MQTT DEBUG] ── dispatch_all fired ─────────────────────────")
 
     def _immediate_update(self, previous_state: bool):
         if previous_state != self.entity.state:

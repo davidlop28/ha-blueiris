@@ -139,12 +139,21 @@ class EntityManager:
 
         state = self.mqtt_states.get(key, default)
 
+        _LOGGER.debug(
+            f"[MQTT DEBUG] get_mqtt_state | key={key!r} | found={key in self.mqtt_states} | value={state} | default={default}"
+        )
+
         return state
 
     def set_mqtt_state(self, topic, event_type, value):
         key = _get_camera_binary_sensor_key(topic, event_type)
 
+        previous = self.mqtt_states.get(key, "<not set>")
         self.mqtt_states[key] = value
+
+        _LOGGER.debug(
+            f"[MQTT DEBUG] set_mqtt_state | key={key!r} | {previous} → {value}"
+        )
 
     def create_components(self):
         config_data = self.config_data
@@ -433,6 +442,11 @@ class EntityManager:
             unique_id = f"{DOMAIN}-{DOMAIN_BINARY_SENSOR}-{entity_name}"
 
             state_topic = MQTT_ALL_TOPIC.replace("+", camera.id)
+
+            _LOGGER.debug(
+                f"[MQTT DEBUG] Building entity | camera.id={camera.id!r} | camera.name={camera.name!r} "
+                f"| sensor_type={sensor_type_name!r} | topic={state_topic!r}"
+            )
 
             default_state = sensor_type_name in NEGATIVE_SENSOR_STATE
 
