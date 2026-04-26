@@ -140,4 +140,4 @@ class BlueIrisEntity(Entity):
         pass
 
     def _immediate_update(self, previous_state: bool):
-        self.async_schedule_update_ha_state(True)
+        self.async_write_ha_state()
