@@ -100,6 +100,10 @@ class BlueIrisApi:
             _LOGGER.warning(f"Request #{i} to BlueIris ({self.base_url}) failed, Data: {data}, Response: {result}")
             await self.login()
 
+            # Refresh the session ID in the request payload after re-login
+            if "session" in data and self.session_id:
+                data["session"] = self.session_id
+
         return None
 
     async def initialize(self):
